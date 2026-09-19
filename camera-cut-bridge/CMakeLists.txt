@@ -20,6 +20,7 @@ add_executable(CameraCut WIN32
   src/Job.cpp
   src/Cfg.cpp
   src/Mch.cpp
+  src/Core.cpp
   res/CameraCut.rc)
 
 target_link_libraries(CameraCut PRIVATE

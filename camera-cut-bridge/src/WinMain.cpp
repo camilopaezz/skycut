@@ -40,7 +40,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR lpCmdLine, int nCmdS
     ShowWindow(hDlg, SW_SHOW);
 
     cfg = GetCfg();
-    if (cfg && cfg->mchAutoStart)
+    if (cfg && cfg->useVendorCore)
+        CoreEnsureRunning();
+    else if (cfg && cfg->mchAutoStart)
         MchEnsureRunning();
 
     while (GetMessage(&msg, NULL, 0, 0) > 0) {

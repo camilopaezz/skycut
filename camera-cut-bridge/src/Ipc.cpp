@@ -35,6 +35,8 @@ INT_PTR HandleUserMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
         Logf(L"WM_CC_CFG lParam=%lld", (long long)lParam);
         SetStatus(hDlg, L"Setcfg");
         SetLastMsg(hDlg, L"CFG");
+        if (GetCfg() && GetCfg()->useVendorCore)
+            CoreForward(WM_CC_CFG, wParam, lParam);
         return 1;
 
     case WM_CC_GO:

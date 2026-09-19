@@ -177,6 +177,36 @@ def patch_bytes(data):
     return bytes(out)
 
 
+def patch_runas_verb(data):
+    """Replace ShellExecute verb 'runas' with 'open\\0' (same 5 bytes) so Mch
+    is not force-elevated when CameraCutCore launches it."""
+    out = bytearray(data)
+    old = b"runas"
+    new = b"open\x00"
+    if len(old) != len(new):
+        die("runas/open length mismatch")
+    count = 0
+    start = 0
+    while True:
+        pos = out.find(old, start)
+        if pos < 0:
+            break
+        # Prefer isolated verb: not part of a longer ASCII token
+        before = out[pos - 1] if pos > 0 else 0
+        after = out[pos + len(old)] if pos + len(old) < len(out) else 0
+        if before >= 0x41 and before <= 0x7A:
+            start = pos + 1
+            continue
+        if after >= 0x41 and after <= 0x7A:
+            start = pos + 1
+            continue
+        out[pos : pos + len(old)] = new
+        count += 1
+        start = pos + len(old)
+    print("runas->open replacements=%d" % count)
+    return bytes(out)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description="Replace RT_MANIFEST requireAdministrator with asInvoker (same length).")
@@ -185,6 +215,8 @@ def main(argv=None):
                    help="overwrite INFILE")
     p.add_argument("--output", metavar="OUT",
                    help="write patched copy to OUT")
+    p.add_argument("--also-patch-runas", action="store_true",
+                   help="also replace ShellExecute verb runas with open (for CameraCutCore)")
     args = p.parse_args(argv)
 
     try:
@@ -193,7 +225,16 @@ def main(argv=None):
     except OSError as e:
         die("cannot read %s: %s" % (args.infile, e))
 
-    patched = patch_bytes(data)
+    if OLD in data:
+        patched = patch_bytes(data)
+    elif b'level="asInvoker"' in data:
+        print("manifest already asInvoker; skipping level patch")
+        patched = data
+    else:
+        die("no requireAdministrator or asInvoker level= in file")
+
+    if args.also_patch_runas:
+        patched = patch_runas_verb(patched)
 
     dest = None
     if args.output:

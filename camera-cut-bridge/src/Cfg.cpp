@@ -18,8 +18,9 @@ static void CfgDefaults(Cfg *c)
     c->lineLen = 0.40;
     c->lineSpace = 0.40;
     c->knifeOffset = 0;
-    c->mchAutoStart = 1;
-    c->useVendorCore = 0;
+    /* Prefer vendor core for real cut; Mch alone does not receive Corel jobs. */
+    c->mchAutoStart = 0;
+    c->useVendorCore = 1;
 }
 
 static int WideToAnsiPath(const wchar_t *wide, char *ansi, int cap)
@@ -110,8 +111,8 @@ bool CfgLoad(Cfg *c)
     c->lineLen = IniGetDoubleA("SETUP", "LineLen", "0.40", iniA);
     c->lineSpace = IniGetDoubleA("SETUP", "LineSpace", "0.40", iniA);
     c->knifeOffset = IniGetDoubleA("SETUP", "KnifeOffset", "0", iniA);
-    c->mchAutoStart = (int)GetPrivateProfileIntA("BRIDGE", "MchAutoStart", 1, iniA);
-    c->useVendorCore = (int)GetPrivateProfileIntA("BRIDGE", "UseVendorCore", 0, iniA);
+    c->mchAutoStart = (int)GetPrivateProfileIntA("BRIDGE", "MchAutoStart", 0, iniA);
+    c->useVendorCore = (int)GetPrivateProfileIntA("BRIDGE", "UseVendorCore", 1, iniA);
 
     g_cfg = *c;
     g_cfgReady = 1;

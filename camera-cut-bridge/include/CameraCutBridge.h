@@ -73,6 +73,12 @@ void JobOnGo(HWND hDlg);
 bool MchIsRunning(void);
 bool MchEnsureRunning(void);
 
+/* Vendor CameraCut.exe renamed CameraCutCore.exe — owns real PLT/cut logic. */
+bool CoreIsRunning(void);
+bool CoreEnsureRunning(void);
+HWND CoreFindWindow(void);
+LRESULT CoreForward(UINT msg, WPARAM wParam, LPARAM lParam);
+
 HWND GetMainDlg(void);
 void SetMainDlg(HWND hDlg);
 void SetStatus(HWND hDlg, const wchar_t *text);

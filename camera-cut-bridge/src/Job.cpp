@@ -143,11 +143,24 @@ void JobOnGo(HWND hDlg)
     JobLogIfExistsA("c:\\myoutput.prn");
     JobLogIfExistsA("c:\\myoutput");
 
-    MchEnsureRunning();
+    {
+        Cfg *cfg = GetCfg();
+        if (cfg && cfg->useVendorCore) {
+            /* Real PLT/cut lives in vendor CameraCut — forward GO to CameraCutCore.exe */
+            if (!CoreEnsureRunning())
+                SetStatus(hDlg, L"CameraCutCore.exe missing — reinstall with core");
+            else {
+                CoreForward(WM_CC_GO, 0, 0);
+                CoreForward(WM_CC_PATH, 4, 0);
+            }
+        } else {
+            MchEnsureRunning();
+        }
+    }
 
     if (haveJob)
         SetStatus(hDlg, paths->jobPath);
-    else
+    else if (!GetCfg() || !GetCfg()->useVendorCore)
         SetStatus(hDlg, L"no job file");
 
     g_jobLastTick = GetTickCount();
