@@ -1,0 +1,13 @@
+#include "resource.h"
+#include <windows.h>
+1 24 "CameraCut.exe.manifest"
+IDD_MAIN DIALOGEX 0, 0, 260, 90
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE
+CAPTION "CameraCut"
+FONT 9, "MS Shell Dlg"
+BEGIN
+  LTEXT "CameraCut bridge - no admin",-1,8,8,240,10
+  LTEXT "Ready",IDC_STATUS,8,22,244,28
+  LTEXT "",IDC_LASTMSG,8,54,244,12
+  PUSHBUTTON "Go",IDC_ACTION,200,72,50,14
+END

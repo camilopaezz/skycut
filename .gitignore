@@ -1,0 +1,29 @@
+# Build
+**/build/
+**/cmake-build-*/
+**/out/
+**/.vs/
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+*.swp
+.idea/
+.vscode/
+
+# Local logs / install leftovers
+*.log
+install.log
+*.patchtmp
