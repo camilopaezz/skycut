@@ -1,5 +1,6 @@
 # Build
 **/build/
+**/build-*/
 **/cmake-build-*/
 **/out/
 **/.vs/
@@ -27,3 +28,6 @@ Thumbs.db
 *.log
 install.log
 *.patchtmp
+
+# Scratch / reverse-engineering dumps
+**/_*.txt

@@ -97,6 +97,8 @@ bool CoreEnsureRunning(void)
     PROCESS_INFORMATION pi;
     DWORD attr;
     HWND hwnd;
+    HWND bridge;
+    BOOL renamed = FALSE;
 
     hwnd = CoreFindWindow();
     if (hwnd)
@@ -104,7 +106,10 @@ bool CoreEnsureRunning(void)
 
     if (CoreIsRunning()) {
         /* process up, window not yet */
-        return CoreFindWindow() != NULL;
+        hwnd = CoreFindWindow();
+        if (hwnd)
+            return true;
+        Logf(L"core process up but window missing; relaunching");
     }
 
     paths = GetPaths();
@@ -120,6 +125,18 @@ bool CoreEnsureRunning(void)
         return false;
     }
 
+    /*
+     * Vendor CameraCut single-instances on FindWindow("#32770","CameraCut").
+     * Hide our bridge title while we spawn core so it does not see us and exit.
+     */
+    bridge = GetMainDlg();
+    if (bridge) {
+        SetWindowTextW(bridge, L"CameraCutBridge");
+        renamed = TRUE;
+        /* Let the title change settle before CreateProcess. */
+        Sleep(50);
+    }
+
     _snwprintf(cmd, MAX_PATH + 4, L"\"%s\"", paths->corePath);
     cmd[MAX_PATH + 3] = L'\0';
 
@@ -132,6 +149,8 @@ bool CoreEnsureRunning(void)
     if (!CreateProcessW(paths->corePath, cmd, NULL, NULL, FALSE, 0, NULL,
                         paths->installDir[0] ? paths->installDir : NULL, &si, &pi)) {
         Logf(L"CreateProcessW Core failed gle=%lu", GetLastError());
+        if (renamed && bridge)
+            SetWindowTextW(bridge, CAMERACUT_TITLE);
         return false;
     }
 
@@ -142,6 +161,12 @@ bool CoreEnsureRunning(void)
     hwnd = CoreFindWindow();
     if (!hwnd)
         Logf(L"core window not found yet (will retry on forward)");
+    else
+        Logf(L"core window hwnd=%p", hwnd);
+
+    if (renamed && bridge)
+        SetWindowTextW(bridge, CAMERACUT_TITLE);
+
     return true;
 }
 

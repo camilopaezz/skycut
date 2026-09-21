@@ -1,6 +1,39 @@
 #include "CameraCutBridge.h"
 
 #include <commctrl.h>
+#include <stdio.h>
+
+/* True if hwnd belongs to another CameraCut.exe (bridge), not Core/Corel. */
+static int IsOtherBridgeInstance(HWND hwnd)
+{
+    DWORD pid = 0;
+    HANDLE h = NULL;
+    wchar_t path[MAX_PATH];
+    DWORD n;
+    const wchar_t *base;
+
+    if (!hwnd)
+        return 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (!pid || pid == GetCurrentProcessId())
+        return 0;
+
+    h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!h)
+        return 0;
+    n = MAX_PATH;
+    path[0] = L'\0';
+    if (!QueryFullProcessImageNameW(h, 0, path, &n)) {
+        CloseHandle(h);
+        return 0;
+    }
+    CloseHandle(h);
+
+    base = wcsrchr(path, L'\\');
+    base = base ? base + 1 : path;
+    /* Only treat another bridge as the single-instance owner. */
+    return _wcsicmp(base, L"CameraCut.exe") == 0;
+}
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR lpCmdLine, int nCmdShow)
 {
@@ -27,7 +60,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR lpCmdLine, int nCmdS
     Logf(L"startup installDir=%s dataDir=%s", paths.installDir, paths.dataDir);
 
     existing = FindWindowA(CAMERACUT_CLASS_A, CAMERACUT_TITLE_A);
-    if (existing) {
+    if (existing && IsOtherBridgeInstance(existing)) {
         SetForegroundWindow(existing);
         return 0;
     }

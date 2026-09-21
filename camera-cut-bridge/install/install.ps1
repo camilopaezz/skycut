@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 # Install the asInvoker CameraCut bridge over vendor CameraCut.exe.
 # Run once elevated. Daily use: CameraCut.exe and Corel as a normal user.
 
@@ -171,7 +171,7 @@ if (-not (Test-Path -LiteralPath $vendorCam)) {
 if (Test-Path -LiteralPath $vendorCam) {
     Invoke-PePatch -Source $vendorCam -Dest $destCore -AlsoRunas
 } else {
-    Write-Warning "No CameraCut.exe.vendor.bak — CameraCutCore.exe not installed. Cutting will not work until core is present."
+    Write-Warning "No CameraCut.exe.vendor.bak - CameraCutCore.exe not installed. Cutting will not work until core is present."
 }
 
 Copy-Item -LiteralPath $BridgeExe -Destination $destExe -Force
@@ -181,16 +181,27 @@ if (Test-Path -LiteralPath $destMch) {
     Invoke-PePatch -Source $destMch -Dest $destMch
 }
 
-# BRIDGE defaults: use vendor core for real cuts
+# BRIDGE defaults: use vendor core for real cuts (idempotent)
 $cfgPath = Join-Path $InstallDir "CameraCut.cfg"
-@"
-[BRIDGE]
-UseVendorCore=1
-MchAutoStart=0
-"@ | Add-Content -LiteralPath $cfgPath -Encoding ASCII
-Write-Host "Appended [BRIDGE] to $cfgPath"
+if (-not (Test-Path -LiteralPath $cfgPath)) {
+    Set-Content -LiteralPath $cfgPath -Value "" -Encoding ASCII
+}
+$cfgText = Get-Content -LiteralPath $cfgPath -Raw -ErrorAction SilentlyContinue
+if ($null -eq $cfgText) { $cfgText = "" }
+if ($cfgText -notmatch '(?m)^\[BRIDGE\]') {
+    $bridgeBlock = @(
+        ""
+        "[BRIDGE]"
+        "UseVendorCore=1"
+        "MchAutoStart=0"
+    ) -join "`r`n"
+    Add-Content -LiteralPath $cfgPath -Value $bridgeBlock -Encoding ASCII
+    Write-Host "Appended [BRIDGE] to $cfgPath"
+} else {
+    Write-Host "Keeping existing [BRIDGE] in $cfgPath"
+}
 
-# Builtin\Users SID — language-independent (Users / Usuarios / etc.)
+# Builtin\Users SID - language-independent (Users / Usuarios / etc.)
 $aclTargets = @(
     "*S-1-5-32-545",
     $env:USERNAME
