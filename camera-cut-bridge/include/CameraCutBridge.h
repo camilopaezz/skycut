@@ -77,7 +77,7 @@ void JobOnGo(HWND hDlg);
 bool MchIsRunning(void);
 bool MchEnsureRunning(void);
 
-/* Vendor CameraCut.exe renamed CameraCutCore.exe — owns real PLT/cut logic. */
+/* Vendor engine\CameraCut.exe (basename CameraCut.exe) — owns real PLT/cut logic. */
 bool CoreIsRunning(void);
 bool CoreEnsureRunning(void);
 HWND CoreFindWindow(void);

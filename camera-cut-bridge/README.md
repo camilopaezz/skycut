@@ -90,7 +90,9 @@ Build `sendmsg` and `fake_mch`. Run the bridge unelevated.
 
 ## How cutting works
 
-GMS talks only to the **bridge** (`CameraCut.exe`, title `CameraCut`). The bridge logs the job and, with `UseVendorCore=1` (default), starts **`CameraCutCore.exe`** (vendor CameraCut, `asInvoker`, `runas` patched to `open`) and forwards `WM_USER+104` / `+10`. Mch alone does not receive Corel jobs — that is why an empty “Camera Cutter” window is not enough.
+GMS talks only to the **bridge** (`CameraCut.exe`, title `CameraCut`). The bridge logs the job and, with `UseVendorCore=1` (default), starts **`engine\CameraCut.exe`** (vendor binary kept under that exact basename — otherwise Setup never loads `[SETUP]` from cfg). Manifest is `asInvoker`, `runas` patched to `open`. Forwards `WM_USER+104` / `+10`. Mch alone does not receive Corel jobs — that is why an empty “Camera Cutter” window is not enough.
+
+`CameraCut.cfg` and `default.fil` are hardlinked between the install root and `engine\` so the bridge and vendor share one settings file.
 
 ## Risks
 
