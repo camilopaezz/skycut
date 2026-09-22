@@ -70,7 +70,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR lpCmdLine, int nCmdS
         Logf(L"CreateDialogParam failed err=%lu", GetLastError());
         return 1;
     }
-    ShowWindow(hDlg, SW_SHOW);
 
     cfg = GetCfg();
     if (cfg && cfg->useVendorCore)

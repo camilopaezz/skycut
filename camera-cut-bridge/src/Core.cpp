@@ -38,11 +38,33 @@ static BOOL CALLBACK CoreEnumProc(HWND hwnd, LPARAM lp)
     return FALSE;
 }
 
+static int CorePathMatches(DWORD pid, const wchar_t *want)
+{
+    HANDLE h;
+    wchar_t path[MAX_PATH];
+    DWORD n = MAX_PATH;
+
+    if (!want || !want[0] || !pid)
+        return 0;
+    h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!h)
+        return 0;
+    path[0] = L'\0';
+    if (!QueryFullProcessImageNameW(h, 0, path, &n)) {
+        CloseHandle(h);
+        return 0;
+    }
+    CloseHandle(h);
+    return _wcsicmp(path, want) == 0;
+}
+
 static DWORD CoreFindPid(void)
 {
     HANDLE snap;
     PROCESSENTRY32W pe;
     DWORD pid = 0;
+    const Paths *paths = GetPaths();
+    const wchar_t *want = (paths && paths->corePath[0]) ? paths->corePath : NULL;
 
     snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE)
@@ -51,7 +73,14 @@ static DWORD CoreFindPid(void)
     pe.dwSize = sizeof(pe);
     if (Process32FirstW(snap, &pe)) {
         do {
+            if (want && _wcsicmp(pe.szExeFile, L"CameraCut.exe") == 0 &&
+                CorePathMatches(pe.th32ProcessID, want)) {
+                /* engine\CameraCut.exe — basename matches bridge; use full path. */
+                pid = pe.th32ProcessID;
+                break;
+            }
             if (_wcsicmp(pe.szExeFile, L"CameraCutCore.exe") == 0) {
+                /* Legacy flat install next to bridge. */
                 pid = pe.th32ProcessID;
                 break;
             }
@@ -120,8 +149,8 @@ bool CoreEnsureRunning(void)
 
     attr = GetFileAttributesW(paths->corePath);
     if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY)) {
-        Logf(L"CameraCutCore.exe missing: %s", paths->corePath);
-        Logf(L"Install vendor CameraCut as CameraCutCore.exe (asInvoker) to enable cutting");
+        Logf(L"vendor core missing: %s", paths->corePath);
+        Logf(L"Install vendor as engine\\CameraCut.exe (basename must be CameraCut.exe)");
         return false;
     }
 

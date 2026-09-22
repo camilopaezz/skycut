@@ -98,13 +98,19 @@ $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 $BridgeExe = [System.IO.Path]::GetFullPath($BridgeExe)
 $destExe = Join-Path $InstallDir "CameraCut.exe"
 $destMch = Join-Path $InstallDir "CameraCutMch.exe"
-$destCore = Join-Path $InstallDir "CameraCutCore.exe"
+# Vendor basename MUST be CameraCut.exe or Setup [SETUP] values stay zero.
+# Keep it under engine\ so it does not replace the bridge CameraCut.exe.
+$engineDir = Join-Path $InstallDir "engine"
+$destCore = Join-Path $engineDir "CameraCut.exe"
+$destCoreLegacy = Join-Path $InstallDir "CameraCutCore.exe"
 $repoMchPath = Resolve-RepoMch $RepoMch
 
 Write-Host "InstallDir=$InstallDir"
 Write-Host "BridgeExe=$BridgeExe"
+Write-Host "EngineCore=$destCore"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path $engineDir | Out-Null
 
 Backup-VendorFile -Path $destExe
 Backup-VendorFile -Path $destMch
@@ -148,10 +154,10 @@ if ($null -ne $repoMchPath) {
     Backup-VendorFile -Path $destMch
 }
 
-# Vendor CameraCut (real cut engine) -> CameraCutCore.exe, asInvoker, no runas
+# Vendor CameraCut (real cut engine) -> engine\CameraCut.exe, asInvoker, no runas
+# Basename must stay CameraCut.exe or vendor skips loading [SETUP] from cfg.
 $vendorCam = Join-Path $InstallDir "CameraCut.exe.vendor.bak"
 if (-not (Test-Path -LiteralPath $vendorCam)) {
-    # First install may have just created bak from live dest, or repo CameraCut.exe
     $repoCam = $null
     if ($null -ne $RepoMch) {
         $repoRoot = [System.IO.Path]::GetFullPath($RepoMch)
@@ -159,9 +165,6 @@ if (-not (Test-Path -LiteralPath $vendorCam)) {
             $cand = Join-Path $repoRoot "CameraCut.exe"
             if (Test-Path -LiteralPath $cand) { $repoCam = $cand }
         }
-    }
-    if ($null -eq $repoCam -and (Test-Path -LiteralPath $destExe)) {
-        # Before overwriting with bridge, bak should exist; if not, user must supply bak
     }
     if ($null -ne $repoCam) {
         Copy-Item -LiteralPath $repoCam -Destination $vendorCam -Force
@@ -171,7 +174,13 @@ if (-not (Test-Path -LiteralPath $vendorCam)) {
 if (Test-Path -LiteralPath $vendorCam) {
     Invoke-PePatch -Source $vendorCam -Dest $destCore -AlsoRunas
 } else {
-    Write-Warning "No CameraCut.exe.vendor.bak - CameraCutCore.exe not installed. Cutting will not work until core is present."
+    Write-Warning "No CameraCut.exe.vendor.bak - engine\CameraCut.exe not installed. Cutting will not work until core is present."
+}
+
+# Drop legacy flat CameraCutCore.exe so it cannot be started by accident
+if (Test-Path -LiteralPath $destCoreLegacy) {
+    Remove-Item -LiteralPath $destCoreLegacy -Force
+    Write-Host "Removed legacy $destCoreLegacy"
 }
 
 Copy-Item -LiteralPath $BridgeExe -Destination $destExe -Force
@@ -200,6 +209,52 @@ if ($cfgText -notmatch '(?m)^\[BRIDGE\]') {
 } else {
     Write-Host "Keeping existing [BRIDGE] in $cfgPath"
 }
+
+# Vendor reads cfg / default.fil next to its own EXE (engine\). Hardlink so one file.
+function Install-SharedFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [byte[]]$EmptyBytes
+    )
+    $root = Join-Path $InstallDir $Name
+    $eng = Join-Path $engineDir $Name
+    if (-not (Test-Path -LiteralPath $root)) {
+        if ($null -ne $EmptyBytes) {
+            [System.IO.File]::WriteAllBytes($root, $EmptyBytes)
+        } else {
+            Set-Content -LiteralPath $root -Value "" -Encoding ASCII
+        }
+        Write-Host "Created $root"
+    }
+    if (Test-Path -LiteralPath $eng) {
+        Remove-Item -LiteralPath $eng -Force
+    }
+    try {
+        cmd.exe /c "mklink /H `"$eng`" `"$root`"" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "mklink exit $LASTEXITCODE" }
+        Write-Host "Hardlinked $eng <-> $root"
+    } catch {
+        Copy-Item -LiteralPath $root -Destination $eng -Force
+        Write-Host "Copied $root -> $eng (hardlink failed: $_)"
+    }
+}
+
+# Prefer repo default.fil when seeding
+$repoDefault = $null
+if ($null -ne $repoMchPath) {
+    $cand = Join-Path (Split-Path -Parent $repoMchPath) "default.fil"
+    if (Test-Path -LiteralPath $cand) { $repoDefault = $cand }
+}
+$defaultRoot = Join-Path $InstallDir "default.fil"
+if (-not (Test-Path -LiteralPath $defaultRoot)) {
+    if ($null -ne $repoDefault) {
+        Copy-Item -LiteralPath $repoDefault -Destination $defaultRoot -Force
+    } else {
+        [System.IO.File]::WriteAllBytes($defaultRoot, [byte[]]@())
+    }
+}
+Install-SharedFile -Name "CameraCut.cfg"
+Install-SharedFile -Name "default.fil" -EmptyBytes @()
 
 # Builtin\Users SID - language-independent (Users / Usuarios / etc.)
 $aclTargets = @(

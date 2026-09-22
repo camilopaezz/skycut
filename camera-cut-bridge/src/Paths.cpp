@@ -79,7 +79,12 @@ bool PathsInit(Paths *p)
         return false;
     if (!PathJoin(g_paths.mchPath, MAX_PATH, g_paths.installDir, L"CameraCutMch.exe"))
         return false;
-    if (!PathJoin(g_paths.corePath, MAX_PATH, g_paths.installDir, L"CameraCutCore.exe"))
+    /*
+     * Vendor must be named CameraCut.exe or it skips loading [SETUP] from cfg
+     * (basename check inside the vendor binary). Keep it in engine\ so it does
+     * not clash with the bridge CameraCut.exe that GMS launches / FindWindow hits.
+     */
+    if (!PathJoin(g_paths.corePath, MAX_PATH, g_paths.installDir, L"engine\\CameraCut.exe"))
         return false;
 
     if (p)

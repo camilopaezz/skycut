@@ -148,7 +148,7 @@ void JobOnGo(HWND hDlg)
         if (cfg && cfg->useVendorCore) {
             /* Real PLT/cut lives in vendor CameraCut — forward GO to CameraCutCore.exe */
             if (!CoreEnsureRunning())
-                SetStatus(hDlg, L"CameraCutCore.exe missing — reinstall with core");
+                SetStatus(hDlg, L"engine\\CameraCut.exe missing — reinstall");
             else {
                 CoreForward(WM_CC_GO, 0, 0);
                 CoreForward(WM_CC_PATH, 4, 0);
