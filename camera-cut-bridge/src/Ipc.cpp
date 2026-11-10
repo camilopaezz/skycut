@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+static bool g_exportPending;
+
 static void SetLastMsg(HWND hDlg, const wchar_t *text)
 {
     if (hDlg && text)
@@ -27,7 +29,15 @@ INT_PTR HandleUserMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg) {
     case WM_CC_PING:
-        SetLastMsg(hDlg, L"PING");
+        SetLastMsg(hDlg, L"JOB READY");
+        if (!g_exportPending) {
+            Logf(L"PING without pending export; no job sent");
+            return 1;
+        }
+        g_exportPending = false;
+        // SKYCut.output sends this only after closing the exported job file.
+        // Preserve the registration parameters on the posted notification.
+        PostMessage(hDlg, WM_CC_JOB_READY, wParam, lParam);
         return 1;
 
     case WM_CC_CFG:
@@ -41,9 +51,10 @@ INT_PTR HandleUserMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 
     case WM_CC_GO:
         SetLastMsg(hDlg, L"GO");
-        /* Defer to WM_COMMAND so SendMessage returns 1 without nesting JobOnGo
-         * (button click and GO share one path; g_jobBusy/debounce still apply). */
-        PostMessage(hDlg, WM_COMMAND, MAKEWPARAM(IDC_ACTION, BN_CLICKED), 0);
+        g_exportPending = true;
+        // This is the pre-export handshake, not permission to read an old job.
+        if (GetCfg() && GetCfg()->useVendorCore)
+            CoreForward(WM_CC_GO, wParam, lParam);
         return 1;
 
     case WM_CC_PATH:
@@ -54,7 +65,7 @@ INT_PTR HandleUserMessage(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
                    ? GetFileAttributesW(paths->jobPath)
                    : INVALID_FILE_ATTRIBUTES;
         if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY))
-            PostMessage(hDlg, WM_COMMAND, MAKEWPARAM(IDC_ACTION, BN_CLICKED), 0);
+            JobOnGo(hDlg, WM_CC_PATH, wParam, lParam);
         else
             Logf(L"WM_CC_PATH job file missing");
         return 1;

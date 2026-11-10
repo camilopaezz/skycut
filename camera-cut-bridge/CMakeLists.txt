@@ -1,5 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
 project(CameraCut C CXX)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(job_send_test src/Job.cpp src/PltGuides.cpp tests/job_send.cpp)
+  target_include_directories(job_send_test BEFORE PRIVATE tests/ipc_stub include)
+  add_test(NAME job_send COMMAND job_send_test "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+  add_executable(ipc_send_test src/Ipc.cpp tests/ipc_send.cpp)
+  target_include_directories(ipc_send_test BEFORE PRIVATE tests/ipc_stub)
+  add_test(NAME ipc_send COMMAND ipc_send_test)
+  add_executable(plt_guides_test src/PltGuides.cpp tests/plt_guides_native.cpp)
+  target_include_directories(plt_guides_test PRIVATE include)
+  add_test(NAME plt_guides COMMAND plt_guides_test "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+endif()
+if(NOT WIN32)
+  return()
+endif()
 
 # MinGW i686 is a secondary toolchain; MSVC is primary.
 
@@ -18,6 +36,7 @@ add_executable(CameraCut WIN32
   src/Paths.cpp
   src/Ipc.cpp
   src/Job.cpp
+  src/PltGuides.cpp
   src/Cfg.cpp
   src/Mch.cpp
   src/Core.cpp

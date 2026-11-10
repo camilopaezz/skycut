@@ -1,9 +1,11 @@
 #include "CameraCutBridge.h"
 
 #include <stdio.h>
+#include "PltGuides.h"
+#include <string>
+#include <exception>
 
 static int g_jobBusy;
-static DWORD g_jobLastTick;
 
 static int JobBytesPrintable(const unsigned char *p, DWORD n)
 {
@@ -105,10 +107,63 @@ static void JobLogIfExistsA(const char *pathA)
     Logf(L"found %s", w);
 }
 
-void JobOnGo(HWND hDlg)
+// Prepare the exact file the vendor consumes. Never scan or rewrite unrelated PLTs.
+static bool JobPrepareGuides(const wchar_t *path)
+{
+    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        Logf(L"guide conversion: open failed gle=%lu", GetLastError());
+        return false;
+    }
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(file, &size) || size.QuadPart < 0 || size.QuadPart > 64*1024*1024) {
+        CloseHandle(file);
+        Logf(L"guide conversion: unreadable or oversized job");
+        return false;
+    }
+    std::string input((size_t)size.QuadPart, '\0'), output;
+    DWORD got = 0;
+    BOOL read = ReadFile(file, input.empty() ? NULL : &input[0], (DWORD)input.size(), &got, NULL);
+    CloseHandle(file);
+    if (!read || got != input.size()) {
+        Logf(L"guide conversion: incomplete read");
+        return false;
+    }
+    if (!PltConvertGuides(input, output)) {
+        Logf(L"guide conversion: unchanged (existing guides or unsupported/ambiguous PLT)");
+        return true;
+    }
+    std::wstring backup = std::wstring(path) + L".before-guides";
+    wchar_t temp[MAX_PATH];
+    const Paths *paths = GetPaths();
+    if (!paths || !GetTempFileNameW(paths->tempDir, L"scg", 0, temp))
+        return false;
+    file = CreateFileW(temp, GENERIC_WRITE, 0, NULL, TRUNCATE_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL, NULL);
+    DWORD written = 0;
+    bool saved = false;
+    if (file != INVALID_HANDLE_VALUE) {
+        saved = WriteFile(file, output.data(), (DWORD)output.size(), &written, NULL) &&
+                written == output.size() && FlushFileBuffers(file);
+        CloseHandle(file);
+    }
+    if (saved)
+        saved = CopyFileW(path, backup.c_str(), FALSE) != FALSE;
+    if (saved)
+        saved = ReplaceFileW(path, temp, NULL, 0, NULL, NULL) != FALSE;
+    if (!saved) {
+        Logf(L"guide conversion: save failed gle=%lu; send stopped", GetLastError());
+        DeleteFileW(temp);
+        return false;
+    }
+    Logf(L"guide conversion: enclosing rectangle replaced; backup=%s", backup.c_str());
+    return true;
+}
+
+void JobOnGo(HWND hDlg, UINT readyMessage, WPARAM wParam, LPARAM lParam)
 {
     const Paths *paths;
-    DWORD now = GetTickCount();
     DWORD attr;
     int haveJob;
 
@@ -116,11 +171,6 @@ void JobOnGo(HWND hDlg)
         Logf(L"JobOnGo skipped (busy)");
         return;
     }
-    if (g_jobLastTick != 0 && (now - g_jobLastTick) < 1000) {
-        Logf(L"JobOnGo skipped (debounce)");
-        return;
-    }
-
     g_jobBusy = 1;
 
     Logf(L"go");
@@ -132,7 +182,24 @@ void JobOnGo(HWND hDlg)
         if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
             haveJob = 1;
             JobLogFile(paths->jobPath);
+            bool prepared = false;
+            try {
+                prepared = JobPrepareGuides(paths->jobPath);
+            } catch (const std::exception &) {
+                Logf(L"guide conversion: exception; send stopped");
+            }
+            if (!prepared) {
+                SetStatus(hDlg, L"Could not prepare guides. Job was not sent.");
+                g_jobBusy = 0;
+                return;
+            }
         }
+    }
+
+    if (!haveJob) {
+        SetStatus(hDlg, L"No job file. Job was not sent.");
+        g_jobBusy = 0;
+        return;
     }
 
     if (paths)
@@ -146,12 +213,11 @@ void JobOnGo(HWND hDlg)
     {
         Cfg *cfg = GetCfg();
         if (cfg && cfg->useVendorCore) {
-            /* Real PLT/cut lives in vendor CameraCut — forward GO to CameraCutCore.exe */
+            /* The vendor may consume the file only after preparation completes. */
             if (!CoreEnsureRunning())
                 SetStatus(hDlg, L"engine\\CameraCut.exe missing — reinstall");
             else {
-                CoreForward(WM_CC_GO, 0, 0);
-                CoreForward(WM_CC_PATH, 4, 0);
+                CoreForward(readyMessage, wParam, lParam);
             }
         } else {
             MchEnsureRunning();
@@ -163,6 +229,5 @@ void JobOnGo(HWND hDlg)
     else if (!GetCfg() || !GetCfg()->useVendorCore)
         SetStatus(hDlg, L"no job file");
 
-    g_jobLastTick = GetTickCount();
     g_jobBusy = 0;
 }

@@ -30,7 +30,10 @@ INT_PTR CALLBACK CameraCutDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lPa
         return TRUE;
     case WM_COMMAND:
         if (LOWORD(wParam) == IDC_ACTION)
-            JobOnGo(hDlg);
+            JobOnGo(hDlg, WM_CC_PING, 0, 0);
+        return TRUE;
+    case WM_CC_JOB_READY:
+        JobOnGo(hDlg, WM_CC_PING, wParam, lParam);
         return TRUE;
     case WM_CLOSE:
         PostQuitMessage(0);

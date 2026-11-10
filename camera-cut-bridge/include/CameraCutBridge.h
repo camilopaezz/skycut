@@ -27,10 +27,12 @@ extern "C" {
 #define MCH_TITLE L"Camera Cutter"
 #define MCH_TITLE_A "Camera Cutter"
 
-#define WM_CC_PING (WM_USER + 100) /* 0x464 */
+#define WM_CC_PING (WM_USER + 100) /* 0x464: exported job ready; w/l are registration x/y */
 #define WM_CC_CFG (WM_USER + 103)  /* 0x467 */
-#define WM_CC_GO (WM_USER + 104)   /* 0x468 */
+#define WM_CC_GO (WM_USER + 104)   /* 0x468: pre-export handshake */
 #define WM_CC_PATH (WM_USER + 10)  /* 0x40A */
+
+#define WM_CC_JOB_READY (WM_APP + 1)
 
 #define IDD_MAIN 102
 #define IDC_ACTION 1001
@@ -72,7 +74,7 @@ bool CfgLoad(Cfg *c);
 bool CfgSave(const Cfg *c);
 Cfg *GetCfg(void);
 
-void JobOnGo(HWND hDlg);
+void JobOnGo(HWND hDlg, UINT readyMessage, WPARAM wParam, LPARAM lParam);
 
 bool MchIsRunning(void);
 bool MchEnsureRunning(void);
