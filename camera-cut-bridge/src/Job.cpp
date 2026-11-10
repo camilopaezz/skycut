@@ -175,6 +175,9 @@ void JobOnGo(HWND hDlg, UINT readyMessage, WPARAM wParam, LPARAM lParam)
 
     Logf(L"go");
 
+    // Setup can change between sends. Use the current saved CutOutline value.
+    Cfg *cfg = GetCfg();
+    CfgLoad(cfg);
     paths = GetPaths();
     haveJob = 0;
     if (paths && paths->jobPath[0]) {
@@ -182,16 +185,20 @@ void JobOnGo(HWND hDlg, UINT readyMessage, WPARAM wParam, LPARAM lParam)
         if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
             haveJob = 1;
             JobLogFile(paths->jobPath);
-            bool prepared = false;
-            try {
-                prepared = JobPrepareGuides(paths->jobPath);
-            } catch (const std::exception &) {
-                Logf(L"guide conversion: exception; send stopped");
-            }
-            if (!prepared) {
-                SetStatus(hDlg, L"Could not prepare guides. Job was not sent.");
-                g_jobBusy = 0;
-                return;
+            if (cfg && cfg->cutOutlineEn) {
+                bool prepared = false;
+                try {
+                    prepared = JobPrepareGuides(paths->jobPath);
+                } catch (const std::exception &) {
+                    Logf(L"guide conversion: exception; send stopped");
+                }
+                if (!prepared) {
+                    SetStatus(hDlg, L"Could not prepare guides. Job was not sent.");
+                    g_jobBusy = 0;
+                    return;
+                }
+            } else {
+                Logf(L"guide conversion: skipped (CutOutline disabled)");
             }
         }
     }
@@ -211,7 +218,6 @@ void JobOnGo(HWND hDlg, UINT readyMessage, WPARAM wParam, LPARAM lParam)
     JobLogIfExistsA("c:\\myoutput");
 
     {
-        Cfg *cfg = GetCfg();
         if (cfg && cfg->useVendorCore) {
             /* The vendor may consume the file only after preparation completes. */
             if (!CoreEnsureRunning())

@@ -124,11 +124,45 @@ Already guided, unsupported, and ambiguous files are copied unchanged. The CLI
 reports whether it converted the file and refuses to overwrite either the input
 or an existing output. It does not send anything to the cutter.
 
+### Observed CutOutline behavior
+
+The user confirmed that enabling CutOutline was the only change between these
+exports. The original inputs and all other settings stayed the same.
+
+| Output | CutOutline | Size | Observed commands |
+| --- | --- | --- | --- |
+| `corteLaTest.plt` | Disabled | 1,014 bytes | No `TB26`/`CT1` header; one trailing `@` |
+| `corteLaTest2.plt` | Enabled | 1,036 bytes | Adds `TB26,4800,40800 CT1` after `IN`; two trailing `@` tokens |
+
+All `U` and `D` motion commands are identical between the two files, including
+the outer rectangle's cutting path. Enabling CutOutline did not convert the
+rectangle to guías or remove that path from this output. `corteLaTest2.plt` is
+also byte-for-byte identical to the original supplied `corteLa.plt`.
+
+The earlier intermediate exports, `skycutexport.job` and `skycutexport_2.job`,
+are byte-for-byte identical at 1,157 bytes, despite enabling CutOutline for the
+second export. Their SHA-256 is
+`99e3055a792f61af3a2bfffcd34614c6a6f4ad425d7847782dc8bb4aaba5204f`.
+The bridge therefore reads the saved `CutOutlineEn` setting before each send;
+the intermediate job does not distinguish the setting in this comparison.
+
+These observations establish the differences in the supplied files. The
+firmware meanings of `TB26`, `CT1`, and the extra terminator have not been
+independently verified, and the comparison does not establish physical cutter
+behavior.
+
 ### Automatic conversion on Send
 
-The bridge includes a native C++ version of the converter. No Python installation
+The bridge includes a native C++ converter for both the final cutter dialect
+and the semicolon-delimited Corel HPGL export. No Python installation
 is required for automatic conversion. Rebuild and install the updated bridge
 using the instructions above, then use the normal Corel Send button.
+
+Automatic rectangle-to-guias conversion runs only when **CutOutline is enabled**
+(`CutOutlineEn=1`). With CutOutline disabled, the original job is forwarded
+unchanged, without creating a conversion backup. The bridge reloads the saved
+configuration before each send, so toggling this setting applies to the next job.
+Other cutting settings remain the vendor engine's responsibility.
 
 The VBA source embedded in `SKYCut.gms` shows that Send first issues
 `WM_USER+104`, exports `%TEMP%\skycutexport.job` with the `cdrPLT` filter, closes
@@ -145,13 +179,24 @@ replacement failures stop this send and are logged. Unsupported or ambiguous
 jobs are forwarded unchanged and logged as unchanged; this does **not** mean
 their enclosing rectangle has been removed.
 
-The supplied PLT pair passes both native converter and send-pipeline tests,
-including byte-for-byte comparison to the manual result. The intermediate
-`skycutexport.job` from Corel has not yet been supplied. Corel may use a different
-PLT dialect from the final cutter files. Automatic recognition of that
-intermediate format and operation with the real Windows vendor engine/cutter
-remain to be verified. If the log reports unchanged for the rectangle example,
-provide that intermediate file before relying on automatic removal.
+The supplied `skycutexport.job` uses absolute HPGL coordinates with `PU`/`PD`
+commands and pen selection. The native converter recognizes a closed four-sided,
+axis-aligned pen-1 rectangle that strictly encloses the remaining artwork with
+at least 40 plotter units of clearance. It replaces only that rectangle's motion
+commands with the guide geometry, retaining the original coordinates, pen,
+header, and all other commands. Relative moves, scaling, unsupported commands,
+missing artwork, and ambiguous enclosures are left unchanged. This HPGL support
+is in the bridge; the standalone Python utility still handles only the final
+cutter dialect described above.
+
+Tests verify the actual Corel job through the send handler, preserve all pen-5
+artwork byte for byte, and map the replacement coordinates to the same guide
+geometry as the user's manual `corteLaGuias.plt`. Existing final cutter fixtures
+also pass byte-for-byte comparison to the manual result. The generated HPGL
+retains pen 1 rather than guessing another pen's meaning. A Corel `.job` export
+of the manual guias version is still needed to compare guide pen settings;
+vendor registration recognition and operation on the real Windows cutter have
+not been validated.
 
 Native tests can also run on Linux without the Windows SDK:
 

@@ -4,7 +4,7 @@
 #include <vector>
 struct Event { UINT msg; WPARAM w; LPARAM l; };
 static std::vector<Event> forwarded, posted, jobs;
-static Cfg cfg={1};
+static Cfg cfg={1,1};
 static Paths paths={L"skycutexport.job",L"temp"};
 static bool fileExists=true;
 void SetDlgItemTextW(HWND,int,const wchar_t*) {}

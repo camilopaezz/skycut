@@ -19,7 +19,7 @@ using INT_PTR = intptr_t;
 #define FILE_ATTRIBUTE_DIRECTORY 16
 #define _snwprintf swprintf
 struct Paths { wchar_t jobPath[64]; wchar_t tempDir[64]; };
-struct Cfg { int useVendorCore; };
+struct Cfg { int useVendorCore; int cutOutlineEn; };
 void SetDlgItemTextW(HWND,int,const wchar_t*);
 void Logf(const wchar_t*,...);
 void SetStatus(HWND,const wchar_t*);

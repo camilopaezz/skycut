@@ -1,4 +1,5 @@
 #include "CameraCutBridge.h"
+#include "PltGuides.h"
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -13,13 +14,15 @@ struct Event {UINT msg;WPARAM w;LPARAM l;};
 static std::map<std::wstring,std::string> files;
 static std::vector<Event> sent;
 static bool failWrite=false, failReplace=false;
-static Cfg cfg={1};
+static Cfg cfg={1,1};
+static int savedCutOutline=1;
 static Paths paths={L"job",L"temp"};
 static std::string expected;
 static void Check(bool b) {if(!b) std::abort();}
 void Logf(const wchar_t*,...) {}
 void SetStatus(HWND,const wchar_t*) {}
 Cfg *GetCfg() {return &cfg;}
+bool CfgLoad(Cfg *c) {c->cutOutlineEn=savedCutOutline;return true;}
 const Paths *GetPaths() {return &paths;}
 HANDLE CreateFileW(const wchar_t*p,DWORD,DWORD,void*,DWORD mode,DWORD,HANDLE) {
     if(!files.count(p)) return INVALID_HANDLE_VALUE;
@@ -93,5 +96,27 @@ int main(int argc,char **argv) {
     expected="IN;PU0,0;PD100,100;";files[L"job"]=expected;
     JobOnGo(nullptr,WM_CC_PING,0,0);
     Check(sent.size()==4);
-    std::cout<<"Send pipeline: conversion before forward, backup, registration parameters, repeat sends, existing guides, failed write/replace, missing and unsupported jobs passed.\n";
+    // Exercise the real client's intermediate Corel HPGL through the send hook.
+    std::string corel=Read(dir+"/skycutexport.job");
+    Check(PltConvertGuides(corel,expected));
+    files[L"job"]=corel;
+    JobOnGo(nullptr,WM_CC_PING,0,0);
+    Check(sent.size()==5 && files[L"job.before-guides"]==corel);
+    // Turning CutOutline off between sends must bypass conversion for both dialects.
+    savedCutOutline=0;
+    std::string backup=files[L"job.before-guides"];
+    failWrite=failReplace=true;
+    for(const std::string &input:std::vector<std::string>{original,corel}) {
+        expected=input;files[L"job"]=input;
+        JobOnGo(nullptr,WM_CC_PING,0,0);
+        Check(files[L"job"]==input && files[L"job.before-guides"]==backup);
+        Check(!files.count(L"tempfile"));
+    }
+    Check(sent.size()==7);
+    // Re-enabling the saved setting must take effect on the very next send.
+    savedCutOutline=1;failWrite=failReplace=false;
+    Check(PltConvertGuides(corel,expected));files[L"job"]=corel;
+    JobOnGo(nullptr,WM_CC_PING,0,0);
+    Check(sent.size()==8);
+    std::cout<<"Send pipeline: CutOutline off/on,  conversion before forward, backup, registration parameters, repeat sends, existing guides, failed write/replace, missing and unsupported jobs passed.\n";
 }

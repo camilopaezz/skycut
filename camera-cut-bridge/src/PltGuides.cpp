@@ -53,6 +53,7 @@ bool IsFrame(const Path &path, double w, double h)
 
 bool PltConvertGuides(const std::string &input, std::string &output)
 {
+    if (CorelConvertGuides(input, output)) return true;
     output=input;
     // Bound parsing work and reject binary or appended metadata conservatively.
     if (input.size()>64*1024*1024 || input.find('\0')!=std::string::npos) return false;
